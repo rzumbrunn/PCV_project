@@ -16,6 +16,7 @@ def euler_sim(M, x0 ,dt, T, Perturbation=None):
         X.append(x)
 
     return np.array(X, dtype=np.complex128)
+
 def rk4_sim(M, x0, dt, T, Perturbation=None):
 
     x = x0
@@ -81,130 +82,11 @@ def Omega_if(t, mu):
 import numpy as np
 import matplotlib.pyplot as plt
 
-#plot interactivley
-
-
-
-def plot_sim(M, x0, dt, T, algo = euler_sim,  Perturbation=None, plots=None, linestyle='-', pad_strat = 'edge', pad_len = 1e5):
-    """
-    plot_sim Executes a simulation and plots the results
-
-    Args:
-        M (_type_): Propagation matrix
-        x0 (_type_): Initial state
-        dt (_type_): Time step size
-        T (_type_): Total time
-        algo (_type_, optional): Alogirthm to run. Defaults to euler_sim.
-        Perturbation (_type_, optional): Time dependent perturbation matrix function. Defaults to None.
-        plots (_type_, optional): Existing plots to add onto. Defaults to None.
-        linestyle (str, optional): linestyle. Defaults to '-'.
-        pad_strat (str, optional): padding strategy. Defaults to 'edge'.
-        pad_len (_type_, optional): padding length. Defaults to 1e5.
-
-    Returns:
-        _type_: _description_
-    """
-    no_to_state = {
-        0: r"i",
-        1: r"\varphi",
-        2: r"\psi_e"
-    }
-    if plots is None:
-        fig, ax = plt.subplots()
-        fig_fft, ax_fft = plt.subplots()
-    else:
-        fig, ax, fig_fft, ax_fft = plots
-
-    pad_len = int(pad_len)
-
-
-    X = algo(M, x0, dt, T, Perturbation)
-    t = np.linspace(0, T, int(T/dt))
-
-
-    X = np.pad(X,[(pad_len,pad_len),(0,0)],pad_strat)
-
-    t = np.linspace(-dt*pad_len, T+dt*pad_len, int(T/dt)+ pad_len*2)
-
-    # plot all the states
-    for i in range(X.shape[1]):
-        ax.plot(t,np.abs(X[:,i]), label=f"$|{no_to_state[i]} \\rangle$ - RK4", linestyle=linestyle)
-    ax.legend()
-
-    # plot the fourier transform
-    W = np.fft.fft(X, axis=0)
-    # move fft
-    #W = np.fft.fftshift(W, axes=0)
-    # get axis scaling
-    freq = np.fft.fftfreq(W.shape[0], d=dt)
-    # plot
-
-    W_max = np.max(np.abs(W))
-    for i in range(W.shape[1]):
-        freq_amplitude = np.abs(W[:,i])
-        freq_amplitude = freq_amplitude/W_max
-
-        ax_fft.plot(freq,freq_amplitude, label=f"$|{no_to_state[i]} \\rangle$ - RK4", linestyle=linestyle)
-
-    ax_fft.legend()
-
-    ax_fft.set_xlim((-0.75*1e-7,0.25*1e-7))
-    # add axis labels
-
-    ax.set_xlabel("Time $\hbar/E_H$")
-    ax.set_ylabel("Population")
-    ax_fft.set_xlabel("Frequency ($E_H/\hbar$)")
-    ax_fft.set_ylabel("Population arb. u.")
-
-    results = [X,t,W, freq]
-
-    return (fig, ax, fig_fft, ax_fft), results
-
-
-def compare_algos(M, x0, dt, T, Perturbation=None):
-    #plots, results_euler = plot_sim(M, x0, dt, T, euler_sim, Perturbation, linestyle='--')
-    plots = None
-    _, results_rk4 = plot_sim(M, x0, dt, T, rk4_sim, Perturbation, plots=plots, linestyle='-', pad_len=0)
-    plt.show()
-
-    #plots, results_rk42 = plot_sim(M, x0, dt, T, rk4_sim, Perturbation, plots=None, linestyle='-.')
-    #plt.show()
-
-    results_euler = None #TODO: remove
-    return results_euler, results_rk4
-
-
-#results_euler, results_rk4 = compare_algos(M, np.array([1, 0, 0]), 0.001e-9/aut, 100e-9/aut, laser)
-
-
-def compare_padding_strats(M,x0,dt,T, Perturbation=None):
-    plots = None
-    plots_wrap, wrap = plot_sim(M, x0, dt, T, rk4_sim, Perturbation, plots=plots, linestyle='-', pad_strat='wrap', pad_len=1e5)
-    plots_edge, edge = plot_sim(M, x0, dt, T, rk4_sim, Perturbation, plots=plots, linestyle='-', pad_strat='edge', pad_len=1e5)
-    plots_zero, zero = plot_sim(M, x0, dt, T, rk4_sim, Perturbation, plots=plots, linestyle='-', pad_strat='constant', pad_len=1e5)
-
-    #save the plots
-    fig, ax, fig_fft, ax_fft = plots_wrap
-    fig.savefig("wrap_td.png")
-    fig_fft.savefig("wrap_fd.png")
-
-    fig, ax, fig_fft, ax_fft = plots_edge
-    fig.savefig("edge_td.png")
-    fig_fft.savefig("edge_fd.png")
-
-    fig, ax, fig_fft, ax_fft = plots_zero
-    fig.savefig("zero_td.png")
-    fig_fft.savefig("zero_fd.png")
-
-    return
-
-# compare_padding_strats(M, np.array([1, 0, 0]), 0.001e-9/aut, 100e-9/aut, laser)
-
 # %%
 
 x0 = np.array([1, 0, 0])
-dt = 0.00001e-9/aut
-T = 60e-9/aut
+dt = 0.0000001e-9/aut
+T = 50e-9/aut
 
 def calc_dissoc_yield(omega, q):
     E_i = -omega
@@ -232,10 +114,8 @@ def calc_dissoc_yield(omega, q):
     Perturbation = laser
 
     X = rk4_sim(M, x0, dt, T, Perturbation)
-    t = np.linspace(0, T, int(T/dt))
 
     q.put(X)
-    # q.put((1 - np.abs(X[-1,0])**2, t, X))
 
 
 # %%
