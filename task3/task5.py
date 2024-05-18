@@ -85,7 +85,7 @@ import matplotlib.pyplot as plt
 # %%
 
 x0 = np.array([1, 0, 0])
-dt = 0.0000001e-9/aut
+dt = 0.000005e-9/aut
 T = 50e-9/aut
 
 def calc_dissoc_yield(omega, q):
@@ -122,7 +122,7 @@ def calc_dissoc_yield(omega, q):
 from multiprocessing import Process, Queue
 import os
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-X_cache_dir = os.path.join(PROJECT_DIR, 'x_cache')
+X_cache_dir = os.path.join('/scratch/islerd/x_cache')
 os.makedirs(X_cache_dir, exist_ok=True)
 
 threads = []
@@ -134,7 +134,7 @@ for omega in omega_range:
     p = Process(target=calc_dissoc_yield, args=(omega,q,))
     threads.append((p, q, omega))
 
-num_threads_max = 30
+num_threads_max = 20
 num_threads_running = 0
 running_threads = []
 
@@ -147,8 +147,9 @@ while len(threads) > 0:
             # dissoc_yield = thread[1].get()
             X = thread[1].get()
             # Store X to disk
-            np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2])}.txt'), X)
-            dissoc_yield = 1 - np.abs(X[-1,0])**2
+            np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2]*1e10)}_dt_{round(dt)}.txt'), X)
+            dissoc_yield = 1 - np.max(np.abs(X[-10000:-1,0])**2)
+            print(f'Saved for omega={thread[2]}') 
             thread[0].join()
             dissoc_yields[thread[2]] = dissoc_yield
             running_threads.remove(thread)
@@ -163,12 +164,13 @@ while len(threads) > 0:
             num_threads_running += 1
             running_threads.append(thread)
 
-# Wait for the remaining threads to finish
+# Wait for the remaining threads to finish 
 for thread in running_threads:
     X = thread[1].get()
     # Store X to disk
-    np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2])}.txt'), X)
-    dissoc_yield = 1 - np.abs(X[-1,0])**2
+    np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2]*1e10)}_dt_{round(dt)}.txt'), X)
+    dissoc_yield = 1 - np.max(np.abs(X[-10000:-1,0])**2)
+    print(f'Saved for omega={thread[2]}') 
     thread[0].join()
     dissoc_yields[thread[2]] = dissoc_yield
 
@@ -176,5 +178,4 @@ for thread in running_threads:
 # Plot the results
 plt.plot(omega_range, list(dissoc_yields.values()))
 plt.savefig(os.path.join(PROJECT_DIR, 'fano.png'))
-
-
+print('Finished successfully')
