@@ -5,50 +5,57 @@ sys.path.append('./PCV_project')
 from plot_config import *
 
 import numpy as np
-def euler_sim(M, x0 ,dt, T, Perturbation=None):
-    x = x0
-    X = []
-    for t in np.linspace(0, T, int(T/dt)):
-        if Perturbation is not None:
-            x = x + 1j * (M+Perturbation(t)) @ x *dt
-        else:
-            x = x + 1j*dt*M @ x
-        X.append(x)
 
-    return np.array(X, dtype=np.complex128)
+def euler_sim(M, x0 ,dt, T, Perturbation=None):
+    t_range = np.linspace(0, T, int(T/dt))[:-1]
+    X = np.zeros((len(t_range)+1, 3), dtype=np.complex128)
+    X[0] = x0
+    # If statements outside the loop for performance!
+    if Perturbation is not None:
+        for i, t in enumerate(t_range):
+            X[i+1] = X[i] + 1j * (M+Perturbation(t)) @ X[i] *dt
+    else:
+        for i, t in enumerate(t_range):
+            X[i+1] = X[i] + 1j*dt*M @ X[i]
+
+    return X
 
 def rk4_sim(M, x0, dt, T, Perturbation=None):
 
-    x = x0
-    X = []
-    for t in np.linspace(0, T, int(T/dt)):
-        if Perturbation is not None:
-            k1 = 1j * (M+Perturbation(t)) @ x
-            k2 = 1j * (M+Perturbation(t+dt/2)) @ (x + k1*dt/2)
-            k3 = 1j * (M+Perturbation(t+dt/2)) @ (x + k2*dt/2)
-            k4 = 1j * (M+Perturbation(t+dt)) @ (x + k3*dt)
-        else:
-            k1 = 1j * M @ x
-            k2 = 1j * M @ (x + k1*dt/2)
-            k3 = 1j * M @ (x + k2*dt/2)
-            k4 = 1j * M @ (x + k3*dt)
-        x = x + (k1 + 2*k2 + 2*k3 + k4)*dt/6
-        X.append(x)
+    t_range = np.linspace(0, T, int(T/dt))[:-1]
+    X = np.zeros((len(t_range)+1, 3), dtype=np.complex128)
+    X[0] = x0
+    if Perturbation is not None:
+        for i, t in enumerate(t_range):
+            k1 = 1j * (M+Perturbation(t)) @ X[i]
+            k2 = 1j * (M+Perturbation(t+dt/2)) @ (X[i] + k1*dt/2)
+            k3 = 1j * (M+Perturbation(t+dt/2)) @ (X[i] + k2*dt/2)
+            k4 = 1j * (M+Perturbation(t+dt)) @ (X[i] + k3*dt)
+            X[i+1] = X[i] + (k1 + 2*k2 + 2*k3 + k4)*dt/6
+    else:
+        for i, t in enumerate(t_range):
+            k1 = 1j * M @ X[i]
+            k2 = 1j * M @ (X[i] + k1*dt/2)
+            k3 = 1j * M @ (X[i] + k2*dt/2)
+            k4 = 1j * M @ (X[i] + k3*dt)
+            X[i+1] = X[i] + (k1 + 2*k2 + 2*k3 + k4)*dt/6
 
-    return np.array(X, dtype=np.complex128)
+    return X
 
 def implicit_euler_sim(M,x0,dt , T, Perturbation = None):
-    x = x0
-    X = []
-    for t in np.linspace(0, T, int(T/dt)):
-        if Perturbation is not None:
-            x = np.linalg.solve(np.eye(M.shape[0])-1j*dt*(M+Perturbation(t)), x)
-        else:
-            x = np.linalg.solve(np.eye(M.shape[0])-1j*dt*M, x)
-        X.append(x)
+
+    t_range = np.linspace(0, T, int(T/dt))[:-1]
+    X = np.zeros((len(t_range)+1, 3), dtype=np.complex128)
+    X[0] = x0
+    if Perturbation is not None:
+        for i, t in enumerate(t_range):
+            X[i+1] = np.linalg.solve(np.eye(M.shape[0])-1j*dt*(M+Perturbation(t)), X[i])
+    else:
+        for i, t in enumerate(t_range):
+            X[i+1] = np.linalg.solve(np.eye(M.shape[0])-1j*dt*M, X[i])
 
 
-    return np.array(X, dtype=np.complex128)
+    return X
 
 # %%
 #constants
@@ -82,10 +89,8 @@ def Omega_if(t, mu):
 import numpy as np
 import matplotlib.pyplot as plt
 
-# %%
-
 x0 = np.array([1, 0, 0])
-dt = 0.000005e-9/aut
+dt = 0.000001e-9/aut
 T = 50e-9/aut
 
 def calc_dissoc_yield(omega, q):
@@ -121,12 +126,12 @@ def calc_dissoc_yield(omega, q):
 # %%
 from multiprocessing import Process, Queue
 import os
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.abspath('')
 X_cache_dir = os.path.join('/scratch/islerd/x_cache')
 os.makedirs(X_cache_dir, exist_ok=True)
 
 threads = []
-omega_range = np.linspace(-1.25*E_i_phi, 1.25*E_i_phi, 60)
+omega_range = np.linspace(-1.25*E_i_phi, 1.25*E_i_phi, 66)
 # Dictionary with omega_range values as keys
 dissoc_yields = {omega: None for omega in omega_range}
 for omega in omega_range:
@@ -134,7 +139,7 @@ for omega in omega_range:
     p = Process(target=calc_dissoc_yield, args=(omega,q,))
     threads.append((p, q, omega))
 
-num_threads_max = 20
+num_threads_max = 22
 num_threads_running = 0
 running_threads = []
 
@@ -149,7 +154,7 @@ while len(threads) > 0:
             # Store X to disk
             np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2]*1e10)}_dt_{round(dt)}.txt'), X)
             dissoc_yield = 1 - np.max(np.abs(X[-10000:-1,0])**2)
-            print(f'Saved for omega={thread[2]}') 
+            print(f'Saved for omega={thread[2]}')
             thread[0].join()
             dissoc_yields[thread[2]] = dissoc_yield
             running_threads.remove(thread)
@@ -164,13 +169,13 @@ while len(threads) > 0:
             num_threads_running += 1
             running_threads.append(thread)
 
-# Wait for the remaining threads to finish 
+# Wait for the remaining threads to finish
 for thread in running_threads:
     X = thread[1].get()
     # Store X to disk
     np.savetxt(os.path.join(X_cache_dir, f'X_{str(thread[2]*1e10)}_dt_{round(dt)}.txt'), X)
     dissoc_yield = 1 - np.max(np.abs(X[-10000:-1,0])**2)
-    print(f'Saved for omega={thread[2]}') 
+    print(f'Saved for omega={thread[2]}')
     thread[0].join()
     dissoc_yields[thread[2]] = dissoc_yield
 
