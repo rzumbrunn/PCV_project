@@ -14,4 +14,6 @@ rcParams['xtick.major.width'] = 1.5
 rcParams['ytick.major.width'] = 1.5
 rcParams['lines.linewidth'] = 2.5
 rcParams['figure.figsize'] = (8, 8)
+rcParams['axes.labelweight'] = 'bold'
+rcParams['axes.labelsize'] = medium_fontsize
 rc('text', usetex=False)
